@@ -49,5 +49,36 @@ public class MySqlWatchedDao extends Daos.MySqlDao implements WatchedDaoInterfac
             }
             return null;
     }
+    @Override
+    public List<String> recommendMovie(String username) throws DaoException
+    {
+        Connection con = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        List<String> d = new ArrayList<>();
+        
+        
+        try {
+            con = this.getConnection();
+            
+             String query = "SELECT director FROM movies,watched WHERE movies.id = watched.movieid and username = ?";
+             ps = con.prepareStatement(query);
+             ps.setString(1, username);
+             
+             rs = ps.executeQuery();
+             while (rs.next()) 
+            {
+                String director = rs.getString("director");
+                
+                d.add(director);
+            }
+         
+            }
+            catch (SQLException e) 
+            {
+                throw new DaoException("recommendMovie() " + e.getMessage());
+            }
+        return d;
+    }
 
 }

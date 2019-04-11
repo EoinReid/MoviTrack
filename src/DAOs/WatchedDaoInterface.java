@@ -12,9 +12,11 @@ package DAOs;
 import DTOs.Watched;
 import Exceptions.DaoException;
 import DAOs.MovieDaoInterface;
+import java.util.List;
 
 
 public interface WatchedDaoInterface {
     
-    public Watched watchMovie(String username,int id) throws DaoException; 
+    public Watched watchMovie(String username,int id) throws DaoException;
+    public List<String> recommendMovie(String username) throws DaoException;
 }
