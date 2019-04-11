@@ -41,12 +41,17 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Server {
 
     MovieDaoInterface movieDao = null;
     WatchedDaoInterface watchDao = null;
+    Map<String, Movie> cache = Collections.synchronizedMap(new HashMap<>());
 
     public static void main(String[] args) {
         Server server = new Server();
@@ -123,16 +128,23 @@ public class Server {
                 while ((message = socketReader.readLine()) != null) // listen at socket for message from client (wait)
                 {
                     System.out.println("Server: (ClientHandler): Read command from client " + clientNumber + ": " + message);
-                    if (message.startsWith("GetAllMovies")) {
+                    if(cache.containsKey(message)){
+                        Movie m = cache.get(message);
+                        System.out.println("This has already been queried and is stored in the cache: ");
+                        String jsonStr = convertToJson(m);
+                        socketWriter.println(jsonStr);
+                        
+                    }else if(message.startsWith("GetAllMovies")) {
+                        
                         List<Movie> ml = movieDao.findAllMovies();
                         String jsonStr = convertToJsonGroup(ml);
                         socketWriter.println(jsonStr);  // send message to client
-                    }
-                    if (message.startsWith("GetMovieById")) {
+                    } else if (message.startsWith("GetMovieById")) {
                         String[] tokens = message.split(" ");
                         int id = Integer.parseInt(tokens[1]);
                         Movie m = movieDao.findMovieById(id); //Need to parse what user enters in the String and the ID they are looking for.
                         String jsonStr = convertToJson(m);
+                        cache.put(message,m);
                         socketWriter.println(jsonStr);
 
                     } else if (message.startsWith("GetMovieByTitle")) {
@@ -140,6 +152,7 @@ public class Server {
                         String title = s;
                         Movie m = movieDao.findMovieByTitle(title);
                         String jsonStr = convertToJson(m);
+                        cache.put(message,m);
                         socketWriter.println(jsonStr);  // send message to client
 
                     } else if (message.startsWith("GetMoviesByDirector")) {
@@ -153,6 +166,7 @@ public class Server {
                     } else if (message.startsWith("deleteMovie")){
                         String s = message.substring(12);
                         int id = Integer.parseInt(s);
+                        cache.clear();
                         movieDao.deleteMovie(id);
                         
                         socketWriter.println("This movie has been deleted from the database.");
@@ -163,7 +177,7 @@ public class Server {
                         String genre = tokens[2];
                         String director = tokens[3];
                         int id = Integer.parseInt(tokens[4]);
-                        
+                        cache.clear();
                         movieDao.updateMovie(title, genre, director, id);
                         socketWriter.println("Movie with id: "+id+ " has been updated");
                         
@@ -197,19 +211,28 @@ public class Server {
                         watchDao.watchMovie(username,id);                                                                   
                         socketWriter.println("The movie you have watched has been added to the database");
                         
+                    }else if(message.startsWith("recommendMovie")){
+                         String[] tokens = message.split(" ");
+                         String username = tokens[1];
+                         List<String> directors = watchDao.recommendMovie(username); //Returns a list of directors watched by this user
+                         int max = directors.size();
+                         int randomNum = ThreadLocalRandom.current().nextInt(0,max); //picks a director from the list of directors that have made movies they watched
+                         String mdirector = directors.get(randomNum);
+                         List<Movie> m2 = dao.findMoviesByDirector(mdirector);
+                         String jsonStr = convertToJsonGroup(m2);// strip off the 'Echo ' part
+                         socketWriter.println(jsonStr);
+                         
                     }
                     else {
-                        socketWriter.println("I'm sorry I don't understand :( ");
+                        socketWriter.println("I'm sorry I don't understand the command you have entered ");
                     }
 
                 }
 
                 socket.close();
 
-            } catch (DaoException e) {
+            } catch (DaoException | IOException e) {
                 e.printStackTrace();
-            } catch (IOException ex) {
-                ex.printStackTrace();
             }
             System.out.println("Server: (ClientHandler): Handler for Client " + clientNumber + " is terminating .....");
         }
